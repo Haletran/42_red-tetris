@@ -1,0 +1,32 @@
+services:
+  frontend:
+    image: oven/bun:canary
+    container_name: frontend
+    working_dir: /front
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./client:/front
+    command: ["sh", "-c", "bun install && bun run dev"]
+    networks:
+      - common
+    restart: always
+
+  backend:
+    image: oven/bun:canary
+    container_name: backend
+    working_dir: /back
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server:/back
+    command: ["sh", "-c", "bun install && bun run dev"]
+    networks:
+      - common
+    restart: always
+
+networks:
+  common:
+    driver: bridge
