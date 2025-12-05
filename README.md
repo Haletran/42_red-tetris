@@ -1,4 +1,4 @@
-# 42_red-tetris
+# 42_red-tetris <img src="https://emojis.slackmojis.com/emojis/images/1643515577/15969/tetris.gif?1643515577"/>
 
 Make a realtime multiplayer tetris clone.
 
