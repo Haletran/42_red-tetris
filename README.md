@@ -9,6 +9,15 @@ Make a realtime multiplayer tetris clone.
 - STATE MANAGEMENT: Redux 
 - SPA (single page application)
 
+We need to follow those rules for the tetris gameplay : [tetris wiki guideline](https://tetris.wiki/Tetris_Guideline)
+
+## Implementation
+
+- First page : Play Solo or create Room buttom or Join a Room
+- Room selection page
+- Gameplay rule (solo or multiplayer up to 100users) (win / loose render)
+- Gamemode (battle royale could be cool, endless)
+
 ## FLOW WS messages
 
 -> des mecs join
