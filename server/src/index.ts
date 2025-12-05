@@ -9,12 +9,12 @@ const app = new Elysia()
 				ws.subscribe(room)
 				console.log(`Player connected to ${room}`)
 			},
-			message(ws, message) {
+			message(ws, { message }) {
 				const data = JSON.parse(message)
 				console.log('message from ', ws.data.params.room, data)
 			},
 			close(ws) {
-				console.log('Disconnected', ws.data.params.room)
+				console.log('Disconnected from', ws.data.params.room)
 		}
 })
 		
