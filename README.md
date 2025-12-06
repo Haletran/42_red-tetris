@@ -44,4 +44,6 @@ And the route for the multiplayer game : /#room_name[\user_name] so that everyth
 
 The room is only launching the game if the first user to join the room press <\return> on his keyboard.
 
+Winning screen at the end. The gameplay is like a battle royale.
+
 
