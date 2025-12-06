@@ -37,7 +37,7 @@ const createPlayer = (type: TetrominoType): Player => {
   }
 }
 
-function Game() {
+export function Game() {
   const [gameState] = useState(() => {
     const bag1 = createBag()
     const bag2 = createBag()
@@ -338,6 +338,8 @@ function Game() {
     setCanHold(false)
   }
 
+
+
   useEffect(() => {
     if (gameRef.current.player) {
       gameRef.current.board = board
@@ -503,7 +505,7 @@ function Game() {
   const displayBoard = renderBoard()
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="flex gap-4">
         {/* Hold Piece */}
         <div className="flex flex-col gap-4">
@@ -596,4 +598,4 @@ function Game() {
   )
 }
 
-export default App
+export default Game

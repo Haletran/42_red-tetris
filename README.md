@@ -33,3 +33,15 @@ We need to follow those rules for the tetris gameplay : [tetris wiki guideline](
 <- game_end 
 
 -><- restart game + reset_state
+
+
+
+## Architecture
+
+So the route for the game must be : / for solo run (endless-mode)
+
+And the route for the multiplayer game : /#room_name[\user_name] so that everything is the url.
+
+The room is only launching the game if the first user to join the room press <\return> on his keyboard.
+
+
