@@ -13,6 +13,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/game/play" element={<Game />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>
