@@ -47,3 +47,24 @@ The room is only launching the game if the first user to join the room press <\r
 Winning screen at the end. The gameplay is like a battle royale.
 
 
+structure de la room :
+
+```ts
+interface Player {
+    name: string;
+    score: number;
+    isCreator: boolean;
+}
+
+
+interface Room {
+    id: number;
+    players: Player[];
+    vacant: boolean; // depend on the number of allowed player
+}
+```
+
+
+### RESSOURCE
+
+[Really cool video on ws for videogame](https://www.youtube.com/watch?v=1fjICYqfUG4)
