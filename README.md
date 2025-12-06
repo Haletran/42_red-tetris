@@ -54,13 +54,22 @@ interface Player {
     name: string;
     score: number;
     isCreator: boolean;
+    isReady: boolean;
+    isAlive: boolean;
+    board?: number[][];
+    currentPiece?: Piece;   
+    nextPieces?: Piece[];   
+    linesCleared?: number; 
 }
 
 
 interface Room {
     id: number;
-    players: Player[];
+    name: string;
+    players: Map<string, Player>; 
     vacant: boolean; // depend on the number of allowed player
+    gameState: 'waiting' | 'playing' | 'finished';
+    createdAt: Date;
 }
 ```
 
