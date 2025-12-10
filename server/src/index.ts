@@ -4,6 +4,7 @@ interface Player {
   id: string;
   name: string;
   isCreator: boolean;
+  isWinner: boolean;
 }
 
 interface Room {
@@ -31,6 +32,7 @@ function joinRoom(player_id: string, room_name: string, player_name: string) {
       id: player_id,
       name: player_name,
       isCreator: false,
+      isWinner: false,
     };
     room.players.set(player_name, player);
     room.isVacant = room.players.size < numberOfPlayer;
@@ -41,6 +43,7 @@ function joinRoom(player_id: string, room_name: string, player_name: string) {
       id: player_id,
       name: player_name,
       isCreator: true,
+      isWinner: false,
     };
 
     const room: Room = {
@@ -115,11 +118,31 @@ const app = new Elysia()
           const room = joinRoom(ws.id, data.room, data.username);
           if (room) {
             console.log("✅ Room joined:", room);
+
+            // Subscribe this connection to the room
+            ws.subscribe(`room:${room.name}`);
+
+            // Broadcast to all players in the room
+            ws.publish(
+              `room:${room.name}`,
+              JSON.stringify({
+                command: "ROOM_UPDATE",
+                room: room.name,
+                players: Array.from(room.players.values()),
+                playerCount: room.players.size,
+                canStart: room.players.size === numberOfPlayer,
+                gameState: room.gameState,
+              })
+            );
+
             ws.send(
               JSON.stringify({
                 command: "JOINED",
                 room: room.name,
                 players: Array.from(room.players.values()),
+                playerCount: room.players.size,
+                canStart: room.players.size === numberOfPlayer,
+                isCreator: room.creatorId === data.username,
               }),
             );
           } else {
@@ -132,8 +155,115 @@ const app = new Elysia()
             );
           }
           break;
+
+        case "START":
+          const conn = connections.get(ws.id);
+          if (!conn) {
+            ws.send(JSON.stringify({ command: "ERROR", message: "Not in a room" }));
+            break;
+          }
+
+          const startRoom = rooms.get(conn.roomId);
+          if (!startRoom) {
+            ws.send(JSON.stringify({ command: "ERROR", message: "Room not found" }));
+            break;
+          }
+
+          // Check if player is creator
+          if (startRoom.creatorId !== conn.playerId) {
+            ws.send(JSON.stringify({ command: "ERROR", message: "Only creator can start" }));
+            break;
+          }
+
+          // Check if enough players
+          if (startRoom.players.size < numberOfPlayer) {
+            ws.send(JSON.stringify({
+              command: "ERROR",
+              message: `Need ${numberOfPlayer} players to start. Currently: ${startRoom.players.size}`
+            }));
+            break;
+          }
+
+          // Start the game
+          startRoom.gameState = "playing";
+          console.log(`🎮 Game started in room ${startRoom.name}`);
+
+          const gameStartMessage = JSON.stringify({
+            command: "GAME_STARTED",
+            room: startRoom.name,
+            players: Array.from(startRoom.players.values()),
+          });
+
+          // Send to creator (sender)
+          ws.send(gameStartMessage);
+
+          // Broadcast game start to all other players in room
+          ws.publish(`room:${startRoom.name}`, gameStartMessage);
+          break;
+
+        case "GAME_OVER":
+          const gameConn = connections.get(ws.id);
+          if (!gameConn) break;
+
+          const gameRoom = rooms.get(gameConn.roomId);
+          if (!gameRoom) break;
+
+          const loser = gameRoom.players.get(gameConn.playerId);
+          if (loser) {
+            console.log(`💀 ${loser.name} lost in room ${gameRoom.name}`);
+
+            // Find the winner (the other player)
+            const winner = Array.from(gameRoom.players.values()).find(
+              p => p.name !== loser.name
+            );
+
+            if (winner) {
+              winner.isWinner = true;
+              gameRoom.gameState = "finished";
+
+              const gameEndMessage = JSON.stringify({
+                command: "GAME_END",
+                winner: winner.name,
+                loser: loser.name,
+              });
+
+              // Send to sender (loser)
+              ws.send(gameEndMessage);
+
+              // Broadcast game end to all players
+              ws.publish(`room:${gameRoom.name}`, gameEndMessage);
+            }
+          }
+          break;
+
+        case "BOARD_UPDATE":
+          const updateConn = connections.get(ws.id);
+          if (!updateConn) break;
+
+          // Broadcast board update to other players in the room
+          ws.publish(
+            `room:${updateConn.roomId}`,
+            JSON.stringify({
+              command: "BOARD_UPDATE",
+              username: data.username,
+              stage: data.stage,
+            })
+          );
+          break;
+
         case "LEAVE":
-          leaveRoom(ws.id);
+          const leftInfo = leaveRoom(ws.id);
+          if (leftInfo && leftInfo.roomId) {
+            // Broadcast to remaining players
+            ws.publish(
+              `room:${leftInfo.roomId}`,
+              JSON.stringify({
+                command: "PLAYER_LEFT",
+                playerId: leftInfo.playerId,
+                remainingPlayers: leftInfo.remainingPlayers,
+              })
+            );
+          }
           break;
       }
     },
