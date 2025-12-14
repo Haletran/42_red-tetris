@@ -30,17 +30,17 @@ const rooms: Map<string, Room> = new Map();
 const connections = new Map<string, { roomId: string; playerId: string }>();
 
 function send_room_message(ws, room: Room, command: string, message: string) {
-	ws.publish(
-      `room:${room.name}`,
-      JSON.stringify({
-        command: command,
-        room: room.name,
-        players: Array.from(room.players.values()),
-        playerCount: room.players.size,
-        canStart: room.players.size === numberOfPlayer,
-        gameState: room.gameState,
-      })
-    );
+	const roomMessage = JSON.stringify({
+		command: command,
+		room: room.name,
+		players: Array.from(room.players.values()),
+		playerCount: room.players.size,
+		canStart: room.players.size === numberOfPlayer,
+		gameState: room.gameState,
+	});
+
+	ws.send(roomMessage);
+	ws.publish(`room:${room.name}`, roomMessage);
 }
 
 function create_room(room_name: string, players: any) {
@@ -61,7 +61,7 @@ function join_room(ws, args: MessageArgs) {
 	ws.subscribe(`room:${args.room_name}`);
 	const room = rooms.get(args.room_name);
 	if (room) {
-		if (room.gameState != "waiting" || room.isVacant == false) {
+		if (room.gameState !== "waiting" || room.isVacant == false) {
 			throw new Error(`Room ${room.name} is already running`);
 		}
 		const player: Player = {
@@ -119,6 +119,16 @@ function leave_room(ws, args: MessageArgs) {
 			connections.delete(ws.id);
 			break;
 		case "finished":
+			room.players.delete(player_id);
+			console.log(`${player_id} left finished room ${room_name}`);
+
+			if (room.players.size === 0) {
+				rooms.delete(room_name);
+				console.log(`${room_name} sucessfully deleted`);
+			} else {
+				send_room_message(ws, room, "PLAYER_LEFT", `${conn.playerId} left`)
+			}
+			connections.delete(ws.id);
 			break;
 	}
 }
@@ -180,7 +190,8 @@ const app = new Elysia()
     },
     close(ws) {
       console.log("WebSocket connection closed", ws.id);
-    },
+	  leave_room(ws, message.args);
+	},
   });
 
 app.listen(3000);
