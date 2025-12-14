@@ -35,19 +35,8 @@ We need to follow those rules for the tetris gameplay : [tetris wiki guideline](
 -><- restart game + reset_state
 
 
-
 ## Architecture
 
-So the route for the game must be : / for solo run (endless-mode)
-
-And the route for the multiplayer game : /#room_name[\user_name] so that everything is the url.
-
-The room is only launching the game if the first user to join the room press <\return> on his keyboard.
-
-Winning screen at the end. The gameplay is like a battle royale.
-
-
-structure de la room :
 
 ```ts
 interface Player {
@@ -73,24 +62,9 @@ interface Room {
 }
 ```
 
-  1. Initial connection: When the client connects, it
-  parses the URL and sends a JOIN command to the
-  server with the room name and username
-  2. Game actions: All the gameplay commands (move,
-  rotate, drop, etc.)
-  3. State sync: Broadcast game state to other players
-   in the room
-
-  So the flow would be:
-  1. User navigates to /#tetris[alice]
-  2. Client parses URL → room: "tetris", user: "alice"
-  3. Client opens WebSocket
-  4. Client sends { command: "JOIN", room: "tetris",
-  username: "alice" }
-  5. Server adds player to room and notifies others
-
-  Let me set up a command handler that works with your
-   URL-based approach:
+url : base_url/room_name/player_name instead of base_url/#room_name[player_name]
+So it will be like : -> analyze the url for room_name and player_name so that it can create a room
+                     -> JOIN command (set the room with everything)
 
 
 ### RESSOURCE
