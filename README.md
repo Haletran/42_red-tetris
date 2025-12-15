@@ -67,6 +67,13 @@ So it will be like : -> analyze the url for room_name and player_name so that it
                      -> JOIN command (set the room with everything)
 
 
+### TODO
+
+- Handle GAME_OVER properly since it doesn't stop the game
+- Make the piece fall faster during the time of the game
+- Add more than 2 players rooms
+- Fix leave room button
+
 ### RESSOURCE
 
 [Really cool video on ws for videogame](https://www.youtube.com/watch?v=1fjICYqfUG4)

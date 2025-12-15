@@ -19,6 +19,8 @@ export interface Room {
   isVacant: boolean;
   players: Map<string, Player>;
   gameState: "waiting" | "playing" | "finished";
+  maxPlayers: number;
+  minPlayers: number;
 }
 
 export interface MessageArgs {

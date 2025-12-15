@@ -1,7 +1,8 @@
 import { Elysia } from "elysia";
 import { Player, Message, MessageArgs, Room} from "type.ts";
 
-const numberOfPlayer = 2;
+const DEFAULT_MAX_PLAYERS = 4;
+const MIN_PLAYERS = 2;
 const rooms: Map<string, Room> = new Map();
 const connections = new Map<string, { roomId: string; playerId: string }>();
 
@@ -11,7 +12,9 @@ function send_room_message(ws, room: Room, command: string, message: string) {
 		room: room.name,
 		players: Array.from(room.players.values()),
 		playerCount: room.players.size,
-		canStart: room.players.size === numberOfPlayer,
+		maxPlayers: room.maxPlayers,
+		minPlayers: room.minPlayers,
+		canStart: room.players.size >= room.minPlayers && room.players.size <= room.maxPlayers,
 		gameState: room.gameState,
 	});
 
@@ -19,7 +22,7 @@ function send_room_message(ws, room: Room, command: string, message: string) {
 	ws.publish(`room:${room.name}`, roomMessage);
 }
 
-function create_room(room_name: string, players: any) {
+function create_room(room_name: string, players: any, maxPlayers: number = DEFAULT_MAX_PLAYERS) {
 	if (rooms.has(room_name)) {
 		throw new Error(`Room ${room_name} already exist`);
 	};
@@ -29,6 +32,8 @@ function create_room(room_name: string, players: any) {
 		isVacant: true,
 		players: players,
 		gameState: "waiting",
+		maxPlayers: maxPlayers,
+		minPlayers: MIN_PLAYERS,
 	};
 	rooms.set(room_name, created_room);
 }
@@ -49,7 +54,7 @@ function join_room(ws, args: MessageArgs) {
 			isAlive: true,
 		};
 		room.players.set(args.player_name, player);
-		room.isVacant = room.players.size < numberOfPlayer;
+		room.isVacant = room.players.size < room.maxPlayers;
 		connections.set(ws.id, { roomId: args.room_name, playerId: args.player_name });
 		return (room);
 	} else {
@@ -85,17 +90,27 @@ function leave_room(ws, args: MessageArgs) {
 				rooms.delete(room_name);
 				console.log(`${room_name} sucessfully deleted`);
 			} else {
-				room.isVacant = room.players.size < numberOfPlayer;
+				room.isVacant = room.players.size < room.maxPlayers;
 				send_room_message(ws, room, "PLAYER_LEFT", `${conn.playerId} left`)
 			}
 			connections.delete(ws.id);
 			break;
 		case "playing":
 			room.players.delete(player_id);
-			const remainingPlayer = Array.from(room.players.values())[0];
-			if (remainingPlayer) remainingPlayer.isWinner = true;
-			room.gameState = "finished";
-			send_room_message(ws, room, "GAME_OVER", "Player left the game")
+			const alivePlayers = Array.from(room.players.values()).filter(p => p.isAlive);
+
+			// If only 1 player left, they win
+			if (alivePlayers.length === 1) {
+				alivePlayers[0].isWinner = true;
+				room.gameState = "finished";
+				send_room_message(ws, room, "GAME_WINNER", `${alivePlayers[0].name} wins!`)
+			} else if (alivePlayers.length === 0) {
+				room.gameState = "finished";
+				send_room_message(ws, room, "GAME_OVER", "All players left")
+			} else {
+				// Game continues with remaining players
+				send_room_message(ws, room, "PLAYER_LEFT", `${conn.playerId} left the game`)
+			}
 			connections.delete(ws.id);
 			break;
 		case "finished":
@@ -125,7 +140,7 @@ function set_player_ready(ws, args: MessageArgs) {
 
 	player.isReady = true;
 	const allReady = Array.from(room.players.values()).every(p => p.isReady);
-	if (allReady && room.players.size === numberOfPlayer) {
+	if (allReady && room.players.size >= room.minPlayers) {
 		// Reset all players to alive and not winners when game starts
 		Array.from(room.players.values()).forEach(p => {
 			p.isAlive = true;

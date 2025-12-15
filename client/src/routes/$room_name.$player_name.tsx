@@ -29,6 +29,8 @@ interface RoomState {
   room: string
   players: Player[]
   playerCount: number
+  maxPlayers: number
+  minPlayers: number
   canStart: boolean
   gameState: 'waiting' | 'playing' | 'finished'
 }
@@ -106,7 +108,7 @@ function GameRoom() {
 
   useEffect(() => {
     // Connect to WebSocket
-    const websocket = new WebSocket('ws://localhost:3000/ws')
+    const websocket = new WebSocket('ws://10.13.7.3:3000/ws')
     wsRef.current = websocket
 
     websocket.onopen = () => {
@@ -219,8 +221,8 @@ function GameRoom() {
     }
   }
 
-  // Get opponent player
-  const opponentPlayer = roomState?.players.find(p => p.name !== player_name)
+  // Get opponent players (all players except current)
+  const opponentPlayers = roomState?.players.filter(p => p.name !== player_name) || []
   const currentPlayer = roomState?.players.find(p => p.name === player_name)
 
   return (
@@ -242,26 +244,31 @@ function GameRoom() {
 
         {/* Game Area - Show when playing */}
         {roomState?.gameState === 'playing' && gameStarted ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {/* Opponent Board */}
-            <div className="flex justify-center">
-              {opponentPlayer ? (
-                <OpponentBoard
-                  board={opponentPlayer.gameData?.board || createEmptyBoard()}
-                  playerName={opponentPlayer.name}
-                  score={opponentPlayer.gameData?.score || 0}
-                  lines={opponentPlayer.gameData?.linesCleared || 0}
-                  isAlive={opponentPlayer.isAlive}
-                />
-              ) : (
-                <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
-                  Waiting for opponent...
-                </div>
-              )}
-            </div>
+          <div className="flex flex-col gap-6 mb-6">
+            {/* Main Game Boards - Side by Side */}
+            <div className="flex justify-center items-start gap-6">
+              {/* Opponent Boards - LEFT */}
+              <div className="grid grid-cols-1 gap-4">
+                {opponentPlayers.length > 0 ? (
+                  opponentPlayers.map((opponent, idx) => (
+                    <OpponentBoard
+                      key={idx}
+                      board={opponent.gameData?.board || createEmptyBoard()}
+                      playerName={opponent.name}
+                      score={opponent.gameData?.score || 0}
+                      lines={opponent.gameData?.linesCleared || 0}
+                      isAlive={opponent.isAlive}
+                    />
+                  ))
+                ) : (
+                  <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
+                    Waiting for opponents...
+                  </div>
+                )}
+              </div>
 
-            {/* Main Game */}
-            <div className="flex flex-col items-center gap-4">
+              {/* Current Player Board - RIGHT */}
+              <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <TetrisBoard board={tetris.board} />
 
@@ -331,29 +338,8 @@ function GameRoom() {
                   </div>
                 </div>
               </div>
-
-              {/* Controls Guide */}
-              <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-300 w-64">
-                <p className="font-semibold mb-2">Controls:</p>
-                <ul className="space-y-1">
-                  <li>← → : Move</li>
-                  <li>↓ : Soft Drop</li>
-                  <li>↑ : Rotate</li>
-                  <li>Space : Hard Drop</li>
-                  <li>P : Pause</li>
-                </ul>
-              </div>
             </div>
-
-            {/* Message Log (moved to sidebar in playing state) */}
-            <div className="bg-gray-800 rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-3">Game Log</h3>
-              <div className="bg-gray-900 rounded p-3 h-96 overflow-y-auto font-mono text-xs">
-                {messages.map((msg, idx) => (
-                  <div key={idx} className="mb-1 text-gray-300">{msg}</div>
-                ))}
-              </div>
-            </div>
+          </div>
           </div>
         ) : (
           /* Waiting Room UI */
@@ -364,7 +350,8 @@ function GameRoom() {
               <p className="text-lg mb-2">Player: {player_name}</p>
               {roomState && (
                 <>
-                  <p className="mb-2">Players: {roomState.playerCount} / 2</p>
+                  <p className="mb-2">Players: {roomState.playerCount} / {roomState.maxPlayers}</p>
+                  <p className="mb-2">Required: At least {roomState.minPlayers} players</p>
                   <p className="mb-4">Can Start: {roomState.canStart ? '✅' : '❌'}</p>
                 </>
               )}
