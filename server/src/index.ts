@@ -1,29 +1,5 @@
 import { Elysia } from "elysia";
-
-interface Player {
-  id: string;
-  name: string;
-  isReady: boolean;
-  isWinner: boolean;
-}
-
-interface Room {
-  id: number;
-  name: string;
-  isVacant: boolean;
-  players: Map<string, Player>;
-  gameState: "waiting" | "playing" | "finished";
-}
-
-interface MessageArgs {
-	room_name: string;
-	player_name: string;
-}
-
-interface Message {
-	command: "JOIN" | "LEAVE" | "INFO" | "READY";
-	args: MessageArgs;
-}
+import { Player, Message, MessageArgs, Room} from "type.ts";
 
 const numberOfPlayer = 2;
 const rooms: Map<string, Room> = new Map();
@@ -69,6 +45,8 @@ function join_room(ws, args: MessageArgs) {
 			name: args.player_name,
 			isReady: false,
 			isWinner: false,
+			gameData: null,
+			isAlive: true,
 		};
 		room.players.set(args.player_name, player);
 		room.isVacant = room.players.size < numberOfPlayer;
@@ -80,6 +58,8 @@ function join_room(ws, args: MessageArgs) {
 			name: args.player_name,
 			isReady: false,
 			isWinner: false,
+			gameData: null,
+			isAlive: true,
 		};
 		const players = new Map([[args.player_name, creator]]);
 		create_room(args.room_name, players);	
@@ -136,7 +116,7 @@ function leave_room(ws, args: MessageArgs) {
 function set_player_ready(ws, args: MessageArgs) {
 	const conn = connections.get(ws.id);
 	if (!conn) throw new Error("No websocket connection found");
-	
+
 	const room = rooms.get(conn.roomId);
 	if (!room) throw new Error("Room not found");
 
@@ -146,6 +126,12 @@ function set_player_ready(ws, args: MessageArgs) {
 	player.isReady = true;
 	const allReady = Array.from(room.players.values()).every(p => p.isReady);
 	if (allReady && room.players.size === numberOfPlayer) {
+		// Reset all players to alive and not winners when game starts
+		Array.from(room.players.values()).forEach(p => {
+			p.isAlive = true;
+			p.isWinner = false;
+			p.gameData = null;
+		});
 		room.gameState = "playing";
 		send_room_message(ws, room, "GAME_START", `Game in ${room.name} is starting`)
 	} else {
@@ -153,6 +139,54 @@ function set_player_ready(ws, args: MessageArgs) {
 	}
 }
 
+
+function handle_board_update(ws, message: Message) {
+	const conn = connections.get(ws.id);
+	if (!conn) throw new Error("No websocket connection found");
+
+	const room = rooms.get(conn.roomId);
+	if (!room) throw new Error("Room not found");
+
+	const player = room.players.get(conn.playerId);
+	if (!player) throw new Error("Player not found");
+
+	if (room.gameState !== "playing") {
+		return;
+	}
+
+	if (message.gameData) {
+		player.gameData = message.gameData;
+		send_room_message(ws, room, "OPPONENT_UPDATE", `${conn.playerId} board updated`);
+	}
+}
+
+function handle_game_over(ws, message: Message) {
+	const conn = connections.get(ws.id);
+	if (!conn) throw new Error("No websocket connection found");
+
+	const room = rooms.get(conn.roomId);
+	if (!room) throw new Error("Room not found");
+
+	const player = room.players.get(conn.playerId);
+	if (!player) throw new Error("Player not found");
+
+	console.log(`Player ${conn.playerId} game over in room ${room.name}`);
+	player.isAlive = false;
+
+	const alivePlayers = Array.from(room.players.values()).filter(p => p.isAlive);
+	console.log(`Alive players remaining: ${alivePlayers.length}`);
+
+	if (alivePlayers.length === 1) {
+		alivePlayers[0].isWinner = true;
+		room.gameState = "finished";
+		console.log(`Winner: ${alivePlayers[0].name}`);
+		send_room_message(ws, room, "GAME_WINNER", `${alivePlayers[0].name} wins!`);
+	} else if (alivePlayers.length === 0) {
+		room.gameState = "finished";
+		console.log("All players eliminated");
+		send_room_message(ws, room, "GAME_OVER", "Game ended");
+	}
+}
 
 function command_analyzer(ws, message: Message) {
 	try {
@@ -167,6 +201,12 @@ function command_analyzer(ws, message: Message) {
 				break;
 			case "LEAVE":
 				leave_room(ws, message.args);
+				break;
+			case "BOARD_UPDATE":
+				handle_board_update(ws, message);
+				break;
+			case "GAME_OVER":
+				handle_game_over(ws, message);
 				break;
 		}
 	} catch(error: any) {
@@ -190,7 +230,14 @@ const app = new Elysia()
     },
     close(ws) {
       console.log("WebSocket connection closed", ws.id);
-	  leave_room(ws, message.args);
+	  const conn = connections.get(ws.id);
+	  if (conn) {
+		  const args: MessageArgs = {
+			  room_name: conn.roomId,
+			  player_name: conn.playerId
+		  };
+		  leave_room(ws, args);
+	  }
 	},
   });
 
